@@ -182,6 +182,7 @@ int main(){
 
         //Caso a CPU esteja "vazia"
         if(processo_atual == -1){
+            printf("\n");
             //caso existam processos na fila de alta prioridade
             if(alta_prioridade->size > 0){
                 processo_atual = remover(alta_prioridade);
@@ -227,6 +228,7 @@ int main(){
         }
 
         else if(processo_atual != -1){
+            printf("\n");
             fatia_tempo_restante--;
             processos[processo_atual].usou_cpu++;
             
@@ -254,6 +256,7 @@ int main(){
         }
     
         if(io_atual == -1){
+            printf("\n");
             if(fila_io->size > 0){
                 io_atual = remover(fila_io);
                 printf("O processo %d agora esta em IO", io_atual);
@@ -263,6 +266,7 @@ int main(){
         }
 
         else{
+            printf("\n");
             fatia_io_restante--;
             printf("O processo %d possui %d u.t. de IO restantes\n", io_atual, fatia_io_restante);
 
