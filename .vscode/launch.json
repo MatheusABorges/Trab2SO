@@ -5,17 +5,17 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "gcc.exe - Criar e depurar o arquivo ativo",
+            "name": "(gdb) Iniciar",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${fileDirname}\\${fileBasenameNoExtension}.exe",
+            "program": "insira o nome do programa, por exemplo ${workspaceFolder}/a.exe",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${fileDirname}",
             "environment": [],
             "externalConsole": false,
             "MIMode": "gdb",
-            "miDebuggerPath": "C:\\MinGW\\bin\\gcc.exe",
+            "miDebuggerPath": "/path/to/gdb",
             "setupCommands": [
                 {
                     "description": "Habilitar a reformatação automática para gdb",
@@ -27,8 +27,7 @@
                     "text": "-gdb-set disassembly-flavor intel",
                     "ignoreFailures": true
                 }
-            ],
-            "preLaunchTask": "C/C++: gcc.exe arquivo de build ativo"
+            ]
         }
     ]
 }
