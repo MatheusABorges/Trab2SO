@@ -1,15 +1,18 @@
 #include<stdio.h>
 #include<stdlib.h>
+#include<time.h>
 
 #define MAX_PROCESSES 8
 #define QUANTUM 4
 #define MAX_SERVICO 8
+#define IO_CHANCE 7
 #define DISCO 0
 #define TDISCO 2
 #define IMPRESSORA 1
 #define TIMPRESSORA 4
 #define FITA 2
 #define TFITA 3
+#define TEMPO_PROX 5
 
 typedef struct Element{
     int valor;
@@ -68,6 +71,12 @@ int remover(fila *f){
     return aux;
 }
 
+void finalizaFila(fila *f){
+    free(f->primeiro);
+    free(f->ultimo);
+    free(f);
+}
+
 typedef struct Process{
     int id;//id do processo
     int tempo_chegada;
@@ -75,63 +84,154 @@ typedef struct Process{
     int tempo_io;//unidades de tempo totais para concluir io
     int inicio_io;//tempo de inicio do io
     int tipo_io;
-    int resta_cpu;//unidades de tempo restantes para cocluir servico
-    int resta_io;//unidades de tempo restantes para concluir io
+    int usou_cpu;//unidades de tempo utilizadas ate o momento em cpu
+    int usou_io;//unidades de tempo utilizadas ate o momento em io
 }processo;
 
-processo* getProcess(int id, int tempo_chegada, int hasIo){
+processo* getProcess(int id, int tempo_chegada){
     processo *p = (processo*)malloc(sizeof(processo));
 
     p->id = id;
     p->tempo_chegada = tempo_chegada;
+    printf("Processo de id %d foi criado\n", id);
+    printf("Chegou no instante de tempo: %d\n", tempo_chegada);
 
     int tempo_servico = rand()%(MAX_SERVICO+1);
     while(tempo_servico == 0){
-        int tempo_servico = rand()%(MAX_SERVICO+1);
+        tempo_servico = rand()%(MAX_SERVICO+1);
     }
     p->tempo_servico = tempo_servico;
-    p->resta_cpu = tempo_servico;
-    int hasIO = rand()%2;
-    if(hasIO){
+    p->usou_cpu = 0;
+
+    printf("Possui %d unidades de tempo de servico\n", tempo_servico);
+
+    int hasIO = rand()%10;
+    if(hasIO<=IO_CHANCE){
         int tipoIo = rand()%3;
         p->tipo_io = tipoIo;
         if(tipoIo == DISCO){
-            p->resta_io = TDISCO;
+            printf("Possui IO do tipo DISCO com %d u.t. de duracao", TDISCO);
+            p->usou_io = 0;
             p->tempo_io = TDISCO;
         }else if(tipoIo == IMPRESSORA){
-            p->resta_io = TIMPRESSORA;
+            printf("Possui IO do tipo IMPRESSORA com %d u.t. de duracao", TIMPRESSORA);
+            p->usou_io = 0;
             p->tempo_io = TIMPRESSORA;
         }else if(tipoIo == FITA){
-            p->resta_io = TFITA;
+            printf("Possui IO do tipo FITA com %d u.t. de duracao", TFITA);
+            p->usou_io = 0;
             p->tempo_io = TFITA;
         }
         p->inicio_io = rand()%(p->tempo_servico +1);
+        printf(" que e executado apos %d u.t. do inicio do processo\n", p->inicio_io);
     }else{
+        printf("Nao possui IO\n");
         p->tempo_io = -1;
         p->tipo_io = -1;
         p->inicio_io = -1;
-        p->resta_io = -1;
+        p->usou_io -1;
     }
-
+    return p;
 }
 
 
 int main(){
 
-    fila *f = getQueue();
-    fila *g = getQueue();
-    for(int i=0; i<MAX_PROCESSES*2; i++){
-        if(i%2 == 0){
-            inserir(i,f);
-        }else{
-            inserir(i,g);
+    srand(time(NULL));
+
+    int instante_tempo = 0;
+    int processos_terminados = 0;
+    int prox_processo_tempo = 0;
+    int fatia_tempo_restante;
+    int pid = 0;
+    int processo_atual = -1;
+
+    processo *processos = (processo*)malloc(sizeof(processo)*MAX_PROCESSES);
+
+    fila *alta_prioridade = getQueue();
+    fila *baixa_prioridade = getQueue();
+    fila *fila_io = getQueue();
+    
+    while(processos_terminados < MAX_PROCESSES){
+
+        if(instante_tempo == prox_processo_tempo && pid < MAX_PROCESSES){
+            processos[pid] = *getProcess(pid, instante_tempo);
+            inserir(alta_prioridade, pid);
+            pid++;
+            printf("\n");
+            int prox = rand()%10;
+            if(prox <= TEMPO_PROX){
+                prox_processo_tempo = instante_tempo + prox;
+            }
+        }
+
+        //Caso a CPU esteja "vazia"
+        if(processo_atual == -1){
+            //caso existam processos na fila de alta prioridade
+            if(alta_prioridade->size > 0){
+                processo_atual = remover(alta_prioridade);
+                //caso o processo precise de IO
+                if(processos[processo_atual].inicio_io == processos[processo_atual].usou_cpu){
+                    processos[processo_atual].inicio_io = -1;
+                    inserir(processo_atual, fila_io);
+                    printf("Processo %d foi para fila de IO\n", processo_atual);
+                    processo_atual = -1;
+                    
+                }else{
+                    printf("Processo %d ganhou CPU\n", processo_atual);                   
+                    fatia_tempo_restante = QUANTUM;
+                }
+            //caso existam processos na fila de baixa prioridade
+            }else if(baixa_prioridade->size > 0){
+                processo_atual = remover(baixa_prioridade);
+                //caso o processo precise de IO
+                if(processos[processo_atual].inicio_io == processos[processo_atual].usou_cpu){
+                    processos[processo_atual].inicio_io = -1;
+                    inserir(processo_atual, fila_io);
+                    printf("Processo %d foi para fila de IO\n", processo_atual);
+                    processo_atual = -1;
+                    
+                }else{
+                    printf("Processo %d ganhou CPU\n", processo_atual);
+                    fatia_tempo_restante = QUANTUM;
+                }
+            //caso nao existam processos em nenhuma das filas
+            }else{
+                printf("CPU Livre, sem processos em fila\n");
+            }
+        }
+
+        else if(processo_atual != -1){
+            fatia_tempo_restante--;
+            processos[processo_atual].usou_cpu++;
+            
+            int tempoRestante = processos[processo_atual].tempo_servico - processos[processo_atual].usou_cpu;
+            printf("Faltam %d u.t. para o processo %d terminar seu uso de CPU\n", tempoRestante, processo_atual);
+
+            if(processos[processo_atual].inicio_io == processos[processo_atual].usou_cpu){
+                inserir(processo_atual, fila_io);
+                processos[processo_atual].inicio_io = -1;
+                printf("Processo %d foi para fila de IO\n", processo_atual);
+                processo_atual = -1;
+            }
+
+            if(fatia_tempo_restante == 0 && processo_atual != -1){
+                if(processos[processo_atual].inicio_io = -1 && processos[processo_atual].usou_cpu == processos[processo_atual].tempo_servico){
+                    printf("O processo %d terminou sua execucao e foi finalizado no instante de tempo %d\n", processo_atual, instante_tempo);
+                    processos_terminados++;
+                }else{
+                    inserir(processo_atual, baixa_prioridade);
+                    printf("O processo %d sofreu preempcao e foi movido para a fila de baixa prioridade\n", processo_atual);
+                }
+                processo_atual = -1;
+            }
+
         }
     }
 
-    for(int i=0; i<MAX_PROCESSES; i++){
-        printf("f: %d\n", remover(f));
-        printf("g: %d\n", remover(g));
-    }
-
+    free(processos);
+    finalizaFila(alta_prioridade);
+    finalizaFila(baixa_prioridade);
+    finalizaFila(fila_io);
     return 0;
 }
