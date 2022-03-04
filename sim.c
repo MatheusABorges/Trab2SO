@@ -2,7 +2,7 @@
 #include<stdlib.h>
 #include<time.h>
 
-#define MAX_PROCESSES 8
+#define MAX_PROCESSES 4
 #define QUANTUM 4
 #define MAX_SERVICO 8
 #define IO_CHANCE 7
@@ -129,11 +129,21 @@ processo* getProcess(int id, int tempo_chegada){
         p->tempo_io = -1;
         p->tipo_io = -1;
         p->inicio_io = -1;
-        p->usou_io -1;
+        p->usou_io = -1;
     }
     return p;
 }
 
+int getTempoIo(int tipoIo){
+    switch (tipoIo)
+    {
+    case IMPRESSORA: return TIMPRESSORA;break;
+    case FITA: return TFITA;break;
+    case DISCO: return TDISCO;break;
+
+    default:return -1;break;
+    }
+}
 
 int main(){
 
@@ -145,6 +155,8 @@ int main(){
     int fatia_tempo_restante;
     int pid = 0;
     int processo_atual = -1;
+    int io_atual = -1;
+    int fatia_io_restante;
 
     processo *processos = (processo*)malloc(sizeof(processo)*MAX_PROCESSES);
 
@@ -156,7 +168,7 @@ int main(){
 
         if(instante_tempo == prox_processo_tempo && pid < MAX_PROCESSES){
             processos[pid] = *getProcess(pid, instante_tempo);
-            inserir(alta_prioridade, pid);
+            inserir(pid, alta_prioridade);
             pid++;
             printf("\n");
             int prox = rand()%10;
@@ -193,7 +205,12 @@ int main(){
                     
                 }else{
                     printf("Processo %d ganhou CPU\n", processo_atual);
-                    fatia_tempo_restante = QUANTUM;
+                    int tempoRestante = processos[processo_atual].tempo_servico - processos[processo_atual].usou_cpu;
+                    if(tempoRestante >= QUANTUM){
+                        fatia_tempo_restante = QUANTUM;
+                    }else{
+                        fatia_io_restante = tempoRestante;
+                    }
                 }
             //caso nao existam processos em nenhuma das filas
             }else{
@@ -216,7 +233,7 @@ int main(){
             }
 
             if(fatia_tempo_restante == 0 && processo_atual != -1){
-                if(processos[processo_atual].inicio_io = -1 && processos[processo_atual].usou_cpu == processos[processo_atual].tempo_servico){
+                if(processos[processo_atual].inicio_io == -1 && processos[processo_atual].usou_cpu == processos[processo_atual].tempo_servico){
                     printf("O processo %d terminou sua execucao e foi finalizado no instante de tempo %d\n", processo_atual, instante_tempo);
                     processos_terminados++;
                 }else{
@@ -227,6 +244,38 @@ int main(){
             }
 
         }
+    
+        if(io_atual == -1){
+            if(fila_io->size > 0){
+                io_atual = remover(fila_io);
+                printf("O processo %d agora esta em IO\n", io_atual);
+                fatia_io_restante = getTempoIo(processos[processo_atual].tipo_io);
+            }
+        }
+
+        else{
+            fatia_io_restante--;
+            printf("O processo %d possui %d u.t. de IO restantes\n", io_atual, fatia_io_restante);
+
+            if(fatia_io_restante == 0) {
+                int cpuRestante = processos[io_atual].tempo_servico - processos[io_atual].usou_cpu;
+                if(cpuRestante != 0){
+                    if(processos[io_atual].tipo_io == DISCO){
+                        inserir(io_atual, baixa_prioridade);
+                        printf("O processo %d foi para a fila de baixa prioridade\n", io_atual);
+                    }else{
+                        inserir(io_atual, alta_prioridade);
+                        printf("O processo %d foi para a fila de alta prioridade\n", io_atual);
+                    }
+                }else{
+                    processos_terminados ++;
+                    printf("O processo %d foi finalizado apos concluir IO no instante de tempo %d\n", io_atual, instante_tempo);
+                }
+                io_atual = -1;
+            }
+        }
+
+        instante_tempo++;
     }
 
     free(processos);
